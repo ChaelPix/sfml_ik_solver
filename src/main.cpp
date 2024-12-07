@@ -51,6 +51,15 @@ public:
     }
 };
 
+void drawCircle(sf::RenderWindow& window, Vector2D center, float radius, sf::Color color) {
+    sf::CircleShape circle(radius);
+    circle.setFillColor(sf::Color::Transparent);
+    circle.setOutlineThickness(1);
+    circle.setOutlineColor(color);
+    circle.setOrigin(radius, radius);
+    circle.setPosition(center.x, center.y);
+    window.draw(circle);
+}
 
 bool checkTriangleValidity(float a, float b, float c) {
     return a + b >= c && a + c >= b && b + c >= a;
@@ -91,10 +100,21 @@ std::vector<Vector2D> resolveIK(const std::vector<float>& chain, std::vector<Vec
         float newSide = findSide(0, std::accumulate(chain.begin(), chain.begin() + i, 0.0f), chain[i], currentSide);
 
         auto intersections = getIntersections(currentSideVector, chain[i], Vector2D(0, 0), newSide);
-        Vector2D intersection = (intersections.first - pole < intersections.second - pole) ? intersections.first : intersections.second;
+        Vector2D intersection = (i > 0 && (intersections.first - vectors[i - 1]).length() <
+                                (intersections.second - vectors[i - 1]).length())
+                                ? intersections.first
+                                : intersections.second;
 
         newVectors.insert(newVectors.begin(), currentSideVector - intersection);
         currentSideVector = intersection;
+        float threshold = 1e-2;
+        if (i > 0 && (intersections.first - vectors[i - 1]).length() + threshold <
+                    (intersections.second - vectors[i - 1]).length()) {
+            intersection = intersections.first;
+        } else {
+            intersection = intersections.second;
+        }
+
     }
 
     newVectors.insert(newVectors.begin(), currentSideVector);
@@ -127,7 +147,7 @@ void drawVectorsChain(sf::RenderWindow& window, Vector2D position, const std::ve
 int main() {
     sf::RenderWindow window(sf::VideoMode(960, 540), "Pixx Inverse Kinematics");
 
-    std::vector<float> chain = {100, 60, 20};                                       //CHANGE CHAIN HERE
+    std::vector<float> chain = {30, 20,30, 20, 20, 30};                                       //CHANGE CHAIN HERE
     std::vector<Vector2D> vectors(chain.size(), Vector2D(0, 0));
 
     Vector2D endEffector(0, 0);
@@ -150,7 +170,7 @@ int main() {
             }
         }
 
-        window.clear(sf::Color(0, 153, 255));
+        window.clear(sf::Color(255, 215, 0));
 
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
             sf::Vector2i mousePos = sf::Mouse::getPosition(window);
@@ -177,7 +197,16 @@ int main() {
         endEffectorCircle.setPosition(endEffectorGlobal.x - 5, endEffectorGlobal.y - 5);
         window.draw(endEffectorCircle);
 
+        // Dessiner le vecteur principal (ligne)
         drawVectorsChain(window, screenMiddlePosition, vectors, sf::Color::White, 7, true, 5, sf::Color(55, 59, 68));
+
+        // Afficher les cercles autour des articulations
+        Vector2D currentPosition = screenMiddlePosition;
+        for (size_t i = 0; i < vectors.size(); ++i) {
+            currentPosition = currentPosition + Vector2D(vectors[i].x, -vectors[i].y);
+            drawCircle(window, currentPosition, chain[i], sf::Color(255, 0, 0));
+        }
+
 
         sf::sleep(sf::milliseconds(1000 / fps));
         window.display();
